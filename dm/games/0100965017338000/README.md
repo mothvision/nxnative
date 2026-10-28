@@ -9,10 +9,17 @@ Main build `d70ce1726c979e45ed4200e9c2b23b2a`.
 The gameplay results below are from the original local bring-up on
 `1a93086e2d4c3ec592bd3cafe9d792f7cab4bfcd`. This contribution ports only
 the remaining BEA, movie-output and indirect-base mechanisms to current
-`main` (`9ac535bb4de0915ad1dc6f6ce114287ee4e28e6d`). The newer upstream
+`main` (`062cd06e6fd79ec0bcd52d59f778fd6438994a2a`). The newer upstream
 module storage, rasterizer-discard and subgroup implementations are kept.
 A full shader rebuild, GPU regression and gameplay run of this port are pending;
 the earlier results do not establish compatibility of this revision.
+
+The October 28 merge builds the Mac host, `t_refl` and `t_indirect_base`.
+The 28 focused Python checks pass, including the environment-switch registry
+and automatic graphics-test discovery. Native reflection passes 34 checks
+with two optional external samples unavailable. The restricted session cannot
+run Metal (`FATAL no Metal device`) or the real-output audio test
+(`FATAL AudioUnit setup failed`); neither suite is claimed to pass here.
 
 Mac bring-up on an Apple M2 with 8 GB RAM: startup, opening movie with
 picture and audio, character selection and entry into a board. The user

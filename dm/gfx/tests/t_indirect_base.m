@@ -25,6 +25,10 @@ int main(void) { @autoreleasepool {
     size_t bytes=(size_t)getpagesize();uint32_t *memory;if(posix_memalign((void**)&memory,bytes,bytes))return 1;
     for(size_t i=0;i<bytes/4;i++)memory[i]=0xcccccccc;
     mtl_pool_add(memory,bytes);state_reset();S.tf_on=0;S.rast_discard=1;
+    // Explicitly bind zero attachments, as OP_SET_RT does. An unset target
+    // skips the draw before any vertex storage write can execute.
+    memset(&R,0,sizeof R);R.has_rt=1;
+    S.has_vp=1;S.vp[0][2]=S.vp[0][3]=1;
     NvProg *program=[NvProg new];program->sh[0]=vs;
     memory[1100]=0;memory[1101]=1;memory[1102]=2;
     uint32_t bases[]={0,128,256};
@@ -42,7 +46,9 @@ int main(void) { @autoreleasepool {
         CHECK("same boundary reused",waits,g_mdi_waits);
         if(getenv("DM_TEST_INDIRECT_BASE_OLD"))vs->rf.drv_binst=0;
         g_geo_program=program;S.prog=(void*)1;
+        uint64_t draws=g_stat_draw;
         draw(indexed?NULL:&arrays,indexed?&elements:NULL);g_geo_program=nil;vs->rf.drv_binst=1;
+        CHECK("draw encoded",1,g_stat_draw-draws);
         CHECK("GPU completed",1,mtl_wait(mtl_sub_commit(),5000000000ull));
         CHECK("GPU error",0,mtl_last_commit_error());
         for(int v=0;v<8;v++)CHECK("driver value or guard",v<3?bases[k]:0xcccccccc,memory[output+v]);

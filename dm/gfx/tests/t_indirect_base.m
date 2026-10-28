@@ -29,7 +29,8 @@ int main(void) { @autoreleasepool {
     // skips the draw before any vertex storage write can execute.
     memset(&R,0,sizeof R);R.has_rt=1;
     S.has_vp=1;S.vp[0][2]=S.vp[0][3]=1;
-    NvProg *program=[NvProg new];program->sh[0]=vs;
+    static prog_t pg={.serial=910505};NvProg *program=[NvProg new];program->sh[0]=vs;
+    serial_put(pg.serial,program);S.prog=&pg;
     memory[1100]=0;memory[1101]=1;memory[1102]=2;
     uint32_t bases[]={0,128,256};
     for(int indexed=0;indexed<2;indexed++)for(int k=0;k<3;k++){
@@ -45,9 +46,8 @@ int main(void) { @autoreleasepool {
         CHECK("repeat read",1,draw_indirect_base(program,indexed?NULL:&arrays,indexed?&elements:NULL));
         CHECK("same boundary reused",waits,g_mdi_waits);
         if(getenv("DM_TEST_INDIRECT_BASE_OLD"))vs->rf.drv_binst=0;
-        g_geo_program=program;S.prog=(void*)1;
         uint64_t draws=g_stat_draw;
-        draw(indexed?NULL:&arrays,indexed?&elements:NULL);g_geo_program=nil;vs->rf.drv_binst=1;
+        draw(indexed?NULL:&arrays,indexed?&elements:NULL);vs->rf.drv_binst=1;
         CHECK("draw encoded",1,g_stat_draw-draws);
         CHECK("GPU completed",1,mtl_wait(mtl_sub_commit(),5000000000ull));
         CHECK("GPU error",0,mtl_last_commit_error());

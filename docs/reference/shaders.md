@@ -53,7 +53,8 @@ Finding, keying and translating shaders (`dm/gfx/tools/shader_split.py`, `dmsh_b
 ### BNSH in Bezel Engine archives
 
 - **How it is stored:** the shaders are BNSH in the `.bfsha` entries of the `.bea` archives (zstd entries, [01](../agents/01-extract.md)), most of them the engine's own in `System.nx.bea` (`_BezelSystemResources/<system>/shader/*.bfsha`: PBR shadow maps 846, post effects 770, …), the rest in the layouts' `__ArchiveShader.bnsh` and the per-archive shader packs (`.bnbshpk`), plus one BNSH in `main`.
-- **Reader:** `shader_split.py` scans each archive entry as a file of its own (`bea_members`).
+- **Reader:** `shader_split.py` scans each archive entry as a file of its own (`bea_members`). Version `0x10100` uses pointers to ASST records; version `0x60000` uses contiguous 0x48-byte records with data/name offsets at +0x38. Treating version 6 as a pointer table fails with `entry 0 … is not an ASST entry`.
+- **Check:** `test_bea.py` reads synthetic archives in both layouts. Version 6 was found on [Super Mario Party Jamboree](../../dm/games/0100965017338000/README.md).
 - **Found on:** [Big Brain Academy: Brain vs. Brain](../../dm/games/0100620012D6E000/README.md) (NintendoWare Bezel Engine 1.56): 2,125 shaders in about 90 s.
 
 ### BNSH entries of GFPAK archives

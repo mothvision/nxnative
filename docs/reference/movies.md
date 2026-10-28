@@ -194,3 +194,11 @@ A decoder hands out as many outputs as it has slots, and while every slot is tak
 - Unity's `Hidden/VideoDecode` samples luma as `.w` of an `R8` texture with the swizzle `(0, 0, 0, R)` (Unity's Alpha8) and chroma from an `RG8` texture at half size; both are CPU-written block-linear textures ([nvn-objects.md](nvn-objects.md)).
 - **Check:** to check the movie path apart from the decoder, fill the frames with a gradient in `hle_movie.c`; it should appear on screen.
 - **Found on:** [Fire Emblem Engage](../../dm/games/0100A6301214E000/README.md).
+
+### Native-texture output consumes the decoder slot
+
+- **Symptom:** a movie stops on one frame while its audio continues; all video output slots eventually remain occupied.
+- **Cause:** in native-texture mode the SDK copies output into a client texture and releases the decoder slot as part of `CopyOutputBufferToClientTextureAndRelease`. The host copied the picture but waited for a separate release that the client does not make.
+- **Fix:** release the slot after copying the texture and signaling its sync, through the same helper used by explicit release. Continue queued packets or a pending H.264 drain when a slot becomes available.
+- **Check:** `test_movie_texture.py` exercises 100 native-texture outputs and output-slot reuse with a fake decoder/GPU; the Mac host build checks the real linkage.
+- **Found on:** [Super Mario Party Jamboree](../../dm/games/0100965017338000/README.md), SDK 17.

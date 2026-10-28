@@ -898,3 +898,12 @@ Digimon Story Cyber Sleuth: Complete Edition (Media.Vision's MVGL engine, SDK 6.
 ### GL movies decoded by the SDK's movie library
 
 - **Found on:** [Digimon Story Cyber Sleuth: Complete Edition](../../dm/games/010014E00DB56000/README.md): the USM movies' H.264 is decoded through the SDK's movie library (the host's decoder) into NV12 buffers (3,110,400 bytes a 1920x1080 frame); the game uploads the planes into a `GL_RED` and a `GL_RG` texture (two `glTexSubImage2D` a frame) and converts YUV in its own shader (in `main`, `SamplerY` / `SamplerUV`).
+
+### Indirect draws use the record's base instance in driver constants
+
+- **Symptom:** scenery stretches into polygons and board-space markers are absent after instance-culling vertex programs start running.
+- **Cause:** Metal reads the correct base instance from each indirect argument record, but the replay filled driver constant `c0 + 0x644` from the command wrapper's zero placeholder. Shaders subtract Metal's base instance from `instance_id`, then add that driver word, so every bucket read bucket zero's transforms instead of its own.
+- **Fix:** reflection records whether the shader reads row `0x640` or indexes c0 dynamically. Those indirect draws synchronize earlier GPU writes and read the base from byte 12 of an array record or byte 16 of an indexed record. A completed boundary is reused until another submission, copy/update or shader write. Their count draws use the synchronized path so argument-buffer reuse cannot bypass the per-record driver value. Other indirect draws keep GPU count masking. The offline driver-read scan now covers every stage; declaration-based runtime admission remains for old metadata.
+- **Check:** `t_indirect_base` queues argument updates on the GPU, checks array and indexed layouts at bases 0, 128 and 256, verifies boundary reuse, and reads the driver value back from vertex storage writes with untouched guards. `DM_TEST_INDIRECT_BASE_OLD=1` substitutes zero and must fail. Compilation passed; the final GPU run is pending. Synthetic reflection checks cover explicit, dynamic and absent metadata.
+- **Found on:** [Super Mario Party Jamboree](../../dm/games/0100965017338000/README.md): the focused diagnostic used record bases 0, 128 and 256; the user confirmed corrected scenery and visible board spaces.
+- **Limit:** the synchronized fallback can add GPU waits for these programs. A GPU-only driver-word patch is not implemented.

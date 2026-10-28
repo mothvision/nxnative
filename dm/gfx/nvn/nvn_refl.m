@@ -88,9 +88,12 @@ int nvn_refl_from_json(NSDictionary *j, nvn_refl *o, char *err, int errlen) {
         }
         NSDictionary *dr = j[@"drv_reads"];
         if ([dr isKindOfClass:[NSDictionary class]]) { o->drv_read[0] = dr[@"0"] != nil; o->drv_read[2] = dr[@"2"] != nil; }
-        // A declared driver-segment binding means the shader reads it: the build's drv_reads scan (dmsh_build.py) matches only fragment-shader names (fp_c0 / fp_c2), so vertex and compute
-        // shaders reading c0 got an all-zero segment (Link's Awakening's light culling multiplied the tile row by a zero workgroup count: every row's lights landed in row 0)
+        // Keep the conservative declaration-based admission: legacy metadata did
+        // not record driver reads outside fragment stages.
         for (int i = 0; i < o->nb; i++) { if (o->b[i].kind == NVN_RB_DRV0) o->drv_read[0] = 1; else if (o->b[i].kind == NVN_RB_DRV2) o->drv_read[2] = 1; }
+        NSDictionary *c0 = [dr isKindOfClass:[NSDictionary class]] ? dr[@"0"] : nil;
+        if ([c0 isKindOfClass:[NSDictionary class]]) o->drv_binst = [c0[@"dynamic"] boolValue] || [c0[@"vec4_offsets"] containsObject:@0x640];
+        else o->drv_binst = o->drv_read[0];   // old or absent metadata: do not silently substitute zero
         NSArray *uf = j[@"drv_unfillable"];
         if ([uf isKindOfClass:[NSArray class]] && uf.count) FAIL("reads driver-bank locations at run time that the replay layer cannot fill: %s", [[uf componentsJoinedByString:@" "] UTF8String]);
         NSString *c1 = j[@"c1"];

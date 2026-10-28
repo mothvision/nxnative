@@ -222,6 +222,7 @@ One line per symptom in the [subsystem references](../reference/): what you see 
 - looping movie previews flash black at the end of every loop. → [Last picture kept across a flush and at end of stream](../reference/movies.md#last-picture-kept-across-a-flush-and-at-end-of-stream)
 - the game crashed on a null right after the failed open. → [`movie::Extractor` runs natively](../reference/movies.md#movieextractor-runs-natively)
 - VP8 WebM movies play black; `movie::Decoder` is created with decoder type 2. → [VP8 uses the same libvpx worker and output paths](../reference/movies.md#vp8-uses-the-same-libvpx-worker-and-output-paths)
+- a movie stops on one frame while its audio continues; all video output slots eventually remain occupied. → [Native-texture output consumes the decoder slot](../reference/movies.md#native-texture-output-consumes-the-decoder-slot)
 
 ## Audio
 
@@ -436,6 +437,7 @@ One line per symptom in the [subsystem references](../reference/): what you see 
 - the NSP script took the game for an OpenGL one (`main imports EGL and names glShaderSource`), the GL shader capture found no shader, and the capture boot stopped with `[nvn-mtl] FATAL cannot read the shader map` from `h_nvnQueueSubmitCommands` called in an NRO (`nro8+0xc10d0`). → [NVN in NROs under an SDL main that names GL](../reference/rendering.md#nvn-in-nros-under-an-sdl-main-that-names-gl)
 - a jump to address 0 right after `glGetFloatv(0xb12)` (`lr=main+0x2d58c4`). → [Which GL functions a game calls](../reference/rendering.md#which-gl-functions-a-game-calls)
 - in a capture run every program links with no uniforms; the game's first `Shader:send` raises a Lua error and, on the Switch, its error handler quits (Any Lua error quits a LÖVE game). → [GL shaders put together at run time and captured](../reference/rendering.md#gl-shaders-put-together-at-run-time-and-captured)
+- scenery stretches into polygons and board-space markers are absent after instance-culling vertex programs start running. → [Indirect draws use the record's base instance in driver constants](../reference/rendering.md#indirect-draws-use-the-records-base-instance-in-driver-constants)
 
 ## Shaders
 

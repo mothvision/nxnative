@@ -91,6 +91,16 @@ int main(void) { @autoreleasepool {
         check("B texture without a resolved slot fails", 1, nvn_refl_from_json(b2, &r, err, sizeof err) != 0);
         printf("%-60s %s\n", "B negative control: unknown kind / missing slot", fail == f1 ? "✓" : "✗");
     }
+    {
+        for (int mode = 0; mode < 4; mode++) {
+            NSDictionary *c0 = @{@"vec4_offsets":mode == 1 ? @[@0x640] : @[@0x150], @"dynamic":@(mode == 2)};
+            NSMutableDictionary *j = [@{@"route":@"B", @"bindings":@[@{@"kind":@"drvcb", @"bank":@0, @"arg_id":@0, @"msl_name":@"vp_c0", @"msl_type":@"constant float4*"}]} mutableCopy];
+            if (mode != 3) j[@"drv_reads"] = @{@"0":c0};
+            check("driver base reflection", 0, nvn_refl_from_json(j, &r, err, sizeof err));
+            check("declared driver bank admitted", 1, r.drv_read[0]);
+            check("base row / dynamic / legacy", mode != 0, r.drv_binst);
+        }
+    }
     printf("== %d checks, %d failed, %d sample files missing (those checks skipped) ==\n", n, fail, skipped);
     return fail != 0;
 } }

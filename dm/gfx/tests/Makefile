@@ -155,6 +155,13 @@ t_geometry: t_geometry.m $(MTL_T_DEP)
 	clang $(CFLAGS) -fobjc-arc -o $@ t_geometry.m $(MTL_T_SRC) $(FW)
 t_feedback: t_feedback.m $(MTL_T_DEP)
 	clang $(CFLAGS) -fobjc-arc -o $@ t_feedback.m $(MTL_T_SRC) $(FW)
+t_indirect_base: t_indirect_base.m $(MTL_T_DEP)
+	clang $(CFLAGS) -fobjc-arc -o $@ t_indirect_base.m $(MTL_T_SRC) $(FW)
+.PHONY: check_t_indirect_base
+check_t_indirect_base: t_indirect_base
+	MTL_DEBUG_LAYER=1 ./t_indirect_base
+	@if DM_TEST_INDIRECT_BASE_OLD=1 MTL_DEBUG_LAYER=1 ./t_indirect_base; then echo "negative control unexpectedly passed"; exit 1; else status=$$?; test $$status -eq 1 || exit $$status; echo "zero-base negative control failed as expected"; fi
+run: check_t_indirect_base
 t_rast_discard: t_rast_discard.m $(MTL_T_DEP)
 	clang $(CFLAGS) -fobjc-arc -o $@ t_rast_discard.m $(MTL_T_SRC) $(FW)
 t_queue_origin: t_queue_origin.m $(MTL_T_DEP)

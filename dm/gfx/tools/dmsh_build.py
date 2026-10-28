@@ -574,7 +574,7 @@ def reflect(key, stage, msl, res):
             e['rw'] = bool(b and b['flags'] & 1)   # BufferUsageFlags.Write; Program.cs serializes the translator enum unchanged (atomics count as writes too)
     return binds
 
-DRV_FILL = {0: [(b, b + 0x100) for b in sorted(SSBO.values())],   # c0: storage buffer address tables (vertex / compute / pixel, 16 slots × 0x10 each)
+DRV_FILL = {0: [(b, b + 0x100) for b in sorted(SSBO.values())] + [(0x200, 0x310), (0x610, 0x620), (0x640, 0x650)],   # c0: storage buffer address tables (vertex / compute / pixel, 16 slots × 0x10 each)
             2: [(TEX_BASE, SEPTEX_BASE), (IMG_BASE, IMG_BASE + 8 * IMG_SLOTS), (SEPTEX_BASE, SAMP_BASE), (SAMP_BASE, SAMP_BASE + 8 * 128)]}   # c2: the handle tables above, all filled by the replay layer
 
 def drv_reads(src):
@@ -582,7 +582,7 @@ def drv_reads(src):
     out = {}
     for bank in (0, 2):
         offs, dyn = set(), False
-        for m in re.finditer(r'fp_c%d\)\._m0\[([^\]]+)\]' % bank, src):
+        for m in re.finditer(r'\b[a-z]+_c%d\)\._m0\[([^\]]+)\]' % bank, src):
             idx = m.group(1).rstrip('u')
             if idx.isdigit(): offs.add(int(idx) * 16)
             else: dyn = True

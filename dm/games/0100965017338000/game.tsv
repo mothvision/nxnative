@@ -1,0 +1,38 @@
+# Game profile of Super Mario Party Jamboree (Switch, update 2.3.0).
+# Earlier Mac bring-up reached a board with correct spaces; validation on current main is pending.
+# Bezel engine, SDK 17, NVN. No game-specific host branches or rewriter cuts.
+
+# ---- Identity ----
+title_id	0100965017338000
+program_id	0100965017338000
+
+# ---- App ----
+name	Super Mario Party Jamboree
+ipa	SuperMarioPartyJamboree.ipa
+app_category	public.app-category.games
+
+# ---- Versions ----
+build	v458752	2.3.0	main=d70ce1726c979e45ed4200e9c2b23b2a	subsdk0=ff2b1a8f14147dc58034940e78a104ef	sdk=fcd139127b9c99988c2613230db18e26
+package	v458752
+shader_versions	v458752
+
+# ---- Files ----
+# Three ordinary modules and 139 collected runtime NROs; subsdk0 supplies the movie decoder.
+modules	main subsdk0 sdk
+romfs_marker	movie/flow/op/movie/bq_op.mp4
+zip_store	.bea:.bfstm:.mp4:.metallib
+
+# ---- Memory ----
+# The NPDM declares 16 MB of system resource, so the SDK uses virtual address memory.
+# For the main build above, nninitStartup at +0x982840 requests 0xe00000000 (56 GiB)
+# for StandardAllocator. The alias region covers this virtual reservation; it does not commit 64 GiB of RAM.
+sys_resource	0x1000000
+mem_reserve	0x1030000000
+mem_alias	0x1008000000
+mem_stack	0x10000000
+app_pool	0xCD500000
+
+# ---- Shader split ----
+# BNSH in version-6 Bezel archives and in main. Source groups are labels, not rendering overrides.
+shader_groups	/Archive/=archive /stream/=stream /nro/=nro /movie/=movie /.nrr/=nrr
+shader_note	Super Mario Party Jamboree shaders

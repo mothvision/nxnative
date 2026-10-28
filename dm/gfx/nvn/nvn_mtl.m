@@ -8672,8 +8672,35 @@ static void cs_hoist_try(NvProg *pr0, const p_draw *dw0, const p_draw_idx *di0) 
     { static int once; if (moved && !once++) MLOG("compute dispatches moved ahead of the render pass they would split (DM_NVN_CS_HOIST): first case pass %llu, %d dispatches", g_stat_pass + 1, moved); }
 }
 void mtl_cshoist_stats(uint64_t *moved, uint64_t *depth, uint64_t *stops) { *moved = g_csh_moved; *depth = g_csh_depth; for (int i = 0; i < 8; i++) stops[i] = g_csh_stop[i]; }
+// c0 + 0x644 must agree with the indirect record's baseInstance, not the
+// command wrapper's zero placeholder. Only programs that read that row use
+// this synchronized fallback; other indirect draws retain GPU count masking.
+// Reuse a completed read boundary until another copy/update or shader write.
+static int draw_indirect_base(NvProg *pr, const p_draw *dw, const p_draw_idx *di) {
+    uint64_t ind = dw ? dw->ind : di ? di->ind : 0;
+    if (!ind) return 0;
+    int reads = 0;
+    for (int st = 0; pr && st < 5; st++) if (pr->sh[st] && pr->sh[st]->rf.drv_binst) reads = 1;
+    if (!reads) return 0;
+    static uint64_t epoch = ~0ull, sub;
+    static uint32_t sbw;
+    if (epoch != g_wr_epoch || sub != g_sub_serial || sbw != g_sbw_gen) {
+        mdi_wait(); epoch = g_wr_epoch; sub = g_sub_serial; sbw = g_sbw_gen;
+    }
+    uint64_t at = ind + (dw ? 12 : 16);
+    if (at < ind || !nvn_host_readable(at, 4)) {
+        RED_ONCE(121, "indirect base instance at %#llx is unreadable: draw skipped", (unsigned long long)at);
+        return -1;
+    }
+    memcpy(&g_draw_binst, (const void *)(uintptr_t)at, 4);
+    PD("I indirect base instance args=%#llx value=%u", (unsigned long long)ind, g_draw_binst);
+    return 1;
+}
 static void draw(const p_draw *dw, const p_draw_idx *di) {
     g_draw_binst = (uint32_t)(dw ? dw->base_instance : di ? di->base_instance : 0);   // c0 + 0x644 of the stages that read the driver segment (encode_args)
+    NvProg *base_program = ((dw && dw->ind) || (di && di->ind)) ? (g_geo_program ? g_geo_program : S.prog ? prog_get(S.prog) : nil) : nil;
+    int indirect_base = draw_indirect_base(base_program, dw, di);
+    if (indirect_base < 0) return;
     if (passdump()) { NvProg *p = g_geo_program ? g_geo_program : S.prog ? prog_get(S.prog) : nil;
         PD("j %llu draw-entry vs=%s fs=%s gs=%s prim=%d count=%d instances=%d indexed=%d indirect=%#llx discard=%d feedback=%d", g_stat_pass + !g_enc,
            p && p->sh[0] ? p->sh[0]->key : "-", p && p->sh[1] ? p->sh[1]->key : "-", p && p->sh[2] ? p->sh[2]->key : "-",
@@ -8687,7 +8714,7 @@ static void draw(const p_draw *dw, const p_draw_idx *di) {
             geo_draw(geometry_program, dw, di); return;
         }
     }
-    int mdx_on = (dw && dw->mdi_cnt) || (di && di->mdi_cnt) ? mdx_wanted(dw, di) : 0;   // an indirect-count multi-draw's record masked on the GPU (mdx_run), else read after a wait
+    int mdx_on = !indirect_base && ((dw && dw->mdi_cnt) || (di && di->mdi_cnt)) ? mdx_wanted(dw, di) : 0;   // an indirect-count multi-draw's record masked on the GPU (mdx_run), else read after a wait
     if (!mdx_on && ((di && di->mdi_cnt && !mdi_live(di->mdi_cnt, di->mdi_i)) || (dw && dw->mdi_cnt && !mdi_live(dw->mdi_cnt, dw->mdi_i)))) return;   // past the multi-draw's count
     if (mdx_on && mdx_next(dw, di)) return;   // the next draw of a masked multi-draw: only the draw is encoded
     g_mdxc.next = NULL;

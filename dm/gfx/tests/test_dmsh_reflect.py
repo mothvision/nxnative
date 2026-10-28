@@ -13,15 +13,16 @@ import dmsh_geometry
 def builder_reflection():
     # Isolate pure reflection code from the builder's CLI/profile initialization.
     tree = ast.parse((TOOLS / 'dmsh_build.py').read_text())
-    names = {'reflect', 'decode_tex', 'decode_ubo_tex', 'const_sampler', 'c2_array'}
+    names = {'reflect', 'decode_tex', 'decode_ubo_tex', 'const_sampler', 'c2_array', 'drv_reads', 'unfillable'}
     selected = [n for n in tree.body if (isinstance(n, ast.FunctionDef) and n.name in names)
-                or (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id == 'SSBO' for t in n.targets))]
+                or (isinstance(n, ast.Assign) and any(isinstance(t, ast.Name) and t.id in ('SSBO', 'DRV_FILL', 'TEX_BASE') for target in n.targets for t in ast.walk(target)))]
     ns = {'re': re, 'dmsh_geometry': dmsh_geometry}
     exec(compile(ast.Module(body=selected, type_ignores=[]), str(TOOLS / 'dmsh_build.py'), 'exec'), ns)
-    return ns['reflect']
+    return ns
 
 
-REFLECT = builder_reflection()
+BUILDER = builder_reflection()
+REFLECT = BUILDER['reflect']
 
 
 def bindings(stage, offsets, flags, cb_slot=0):
@@ -31,6 +32,28 @@ def bindings(stage, offsets, flags, cb_slot=0):
                       'cb_offset': off // 4, 'flags': flag}
                      for i, (off, flag) in enumerate(zip(offsets, flags))]}
     return REFLECT('synthetic', stage, source, res)
+
+
+class DriverReads(unittest.TestCase):
+    def test_every_stage_records_driver_offsets(self):
+        for stage in ('vp', 'fp', 'cp', 'gp', 'tcp', 'tep'):
+            with self.subTest(stage=stage):
+                src = f'(*args.{stage}_c0)._m0[100].y + (*args.{stage}_c2)._m0[8u].x'
+                self.assertEqual(BUILDER['drv_reads'](src), {
+                    '0': {'vec4_offsets': [0x640], 'dynamic': False},
+                    '2': {'vec4_offsets': [0x80], 'dynamic': False}})
+
+    def test_runtime_driver_rows_are_fillable(self):
+        for offset in (0x150, 0x200, 0x210, 0x610, 0x640):
+            with self.subTest(offset=offset):
+                self.assertEqual(BUILDER['unfillable']({'0': {'vec4_offsets': [offset], 'dynamic': False}}), [])
+        self.assertEqual(BUILDER['unfillable']({'0': {'vec4_offsets': [0x700], 'dynamic': False}}), ['c0+0x700'])
+
+    def test_dynamic_and_duplicate_reads(self):
+        src = '(*a.vp_c0)._m0[i] + (*a.cp_c0)._m0[21] + (*a.vp_c0)._m0[21u]'
+        self.assertEqual(BUILDER['drv_reads'](src), {
+            '0': {'vec4_offsets': [0x150], 'dynamic': True}})
+        self.assertEqual(BUILDER['drv_reads']('(*a.vp_c1)._m0[100]'), {})
 
 
 class StorageBuffers(unittest.TestCase):

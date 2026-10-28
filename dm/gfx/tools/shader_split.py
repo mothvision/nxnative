@@ -695,16 +695,21 @@ def mtarc_shaders(d, label, out):
 SCNE, ZSTD_MAGIC = b'SCNE', bytes.fromhex('28b52ffd')
 LZ4_FRAME_MAGIC = bytes.fromhex('04224d18')   # the frame of HAL's other .cmp container (the ubin/ map data)
 def bea_members(d, label):
-    """NintendoWare Bezel Engine archive ('.bea', magic 'SCNE', a NintendoWare binary file of version 0x10100; Big Brain Academy: Brain vs. Brain keeps nearly all of RomFS in 603 of them):
+    """NintendoWare Bezel Engine archive ('.bea', magic 'SCNE', a NintendoWare binary file; Big Brain Academy: Brain vs. Brain keeps nearly all of RomFS in 603 of them):
     +0x20 u64 entry count, +0x28 u64 offset of the entry pointer array (u64 each), each pointing at a 0x30-byte 'ASST' entry {+0x10 u16 kind, u16 alignment shift, u32 stored length,
     u32 length, +0x20 u64 data offset, +0x28 u64 name offset (u16 length + the path)}. Every entry of the game's 7,665 is one zstd frame (kind 2, and 258 for the one sound project),
-    even the two whose stored length equals their length, so the frame magic decides. → (path, data) of each entry"""
+    even the two whose stored length equals their length, so the frame magic decides. Version 0x60000 (Jamboree) uses inline 0x48-byte records,
+    with data/name offsets at +0x38/+0x40. Version 0x10100 keeps the pointer layout above. → (path, data) of each entry"""
     n, arr = struct.unpack_from('<QQ', d, 0x20)
+    version = struct.unpack_from('<I', d, 8)[0]
+    if version not in (0x10100, 0x60000): red(f'{label}: unsupported BEA version {version:#x}')
     zstd = None
     for i in range(n):
-        o = struct.unpack_from('<Q', d, arr + 8 * i)[0]
+        # Version 6 stores contiguous 0x48-byte ASST records, rather than pointers.
+        o = arr + 0x48 * i if version == 0x60000 else struct.unpack_from('<Q', d, arr + 8 * i)[0]
         if d[o:o + 4] != b'ASST': red(f'{label}: entry {i} @{o:#x} is not an ASST entry')
-        csz, usz, off, nm = struct.unpack_from('<II4xQQ', d, o + 0x14)
+        csz, usz = struct.unpack_from('<II', d, o + 0x14)
+        off, nm = struct.unpack_from('<QQ', d, o + (0x38 if version == 0x60000 else 0x20))
         path = d[nm + 2:nm + 2 + struct.unpack_from('<H', d, nm)[0]].decode('utf-8', 'replace')
         data = d[off:off + csz]
         if data[:4] == ZSTD_MAGIC:
